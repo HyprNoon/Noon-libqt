@@ -28,3 +28,4 @@ install(FILES ${qmldir_utils} ${typeinfo_utils} DESTINATION "${QML_INSTALL_DIR}/
 
 add_subdirectory(latex)
 add_subdirectory(qr)
+add_subdirectory(downloader)
