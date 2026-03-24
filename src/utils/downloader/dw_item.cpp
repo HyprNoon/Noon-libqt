@@ -1,27 +1,35 @@
 #include "dw_item.hpp"
 
+#include <KIO/OpenUrlJob>
+#include <KIO/OpenFileManagerWindowJob>
 #include <QFileInfo>
 #include <KIO/Job>
 
-DownloadItem::DownloadItem(const QString &label,
-                           const QUrl    &url,
-                           const QUrl    &destination,
-                           QObject       *parent)
-    : DownloadItem(label, url, destination, 0, 0, 0, State::Queued, parent)
+DownloadItem::DownloadItem(const QString              &label,
+                           const QUrl                 &url,
+                           const QUrl                 &destination,
+                           const QString              &userAgent,
+                           const QMap<QString,QString> &headers,
+                           QObject                    *parent)
+    : DownloadItem(label, url, destination, 0, 0, 0, State::Queued, userAgent, headers, parent)
 {}
 
-DownloadItem::DownloadItem(const QString &label,
-                           const QUrl    &url,
-                           const QUrl    &destination,
-                           int            restoredProgress,
-                           qint64         restoredTotal,
-                           qint64         restoredReceived,
-                           State          restoredState,
-                           QObject       *parent)
+DownloadItem::DownloadItem(const QString              &label,
+                           const QUrl                 &url,
+                           const QUrl                 &destination,
+                           int                         restoredProgress,
+                           qint64                      restoredTotal,
+                           qint64                      restoredReceived,
+                           State                       restoredState,
+                           const QString              &userAgent,
+                           const QMap<QString,QString> &headers,
+                           QObject                    *parent)
     : QObject(parent)
     , m_label(label)
     , m_url(url)
     , m_destination(destination)
+    , m_userAgent(userAgent)
+    , m_headers(headers)
     , m_progress(restoredProgress)
     , m_state(restoredState)
     , m_totalBytes(restoredTotal)
@@ -37,7 +45,9 @@ DownloadItem::DownloadItem(const QString &label,
         m_job->suspend();
 }
 
-DownloadItem *DownloadItem::fromJson(const QJsonObject &obj, QObject *parent)
+DownloadItem *DownloadItem::fromJson(const QJsonObject &obj,
+                                     const QString     &userAgent,
+                                     QObject           *parent)
 {
     const QString label         = obj.value("label").toString();
     const QUrl    url           = QUrl(obj.value("url").toString());
@@ -47,12 +57,17 @@ DownloadItem *DownloadItem::fromJson(const QJsonObject &obj, QObject *parent)
     const qint64  receivedBytes = obj.value("receivedBytes").toInteger(0);
     const State   state         = stateFromString(obj.value("state").toString());
 
+    QMap<QString,QString> headers;
+    const QJsonObject     headersObj = obj.value("headers").toObject();
+    for (auto it = headersObj.begin(); it != headersObj.end(); ++it)
+        headers.insert(it.key(), it.value().toString());
+
     if (label.isEmpty() || !url.isValid() || !destination.isValid())
         return nullptr;
 
     return new DownloadItem(label, url, destination,
                             progress, totalBytes, receivedBytes,
-                            state, parent);
+                            state, userAgent, headers, parent);
 }
 
 void DownloadItem::startJob(bool resume)
@@ -62,6 +77,25 @@ void DownloadItem::startJob(bool resume)
         : (KIO::Overwrite | KIO::HideProgressInfo);
 
     m_job = KIO::file_copy(m_url, m_destination, -1, flags);
+
+    if (!m_userAgent.isEmpty())
+        m_job->addMetaData("UserAgent", m_userAgent);
+
+    m_job->addMetaData("SendLanguageSettings", "false");
+    m_job->addMetaData("cookies",              "none");
+    m_job->addMetaData("cache",                "reload");
+    m_job->addMetaData("no-auth",              "true");
+
+    if (!m_url.host().isEmpty()) {
+        const QString origin = m_url.scheme() + "://" + m_url.host();
+        if (!m_headers.contains("Referer"))
+            m_job->addMetaData("Referer", origin);
+        if (!m_headers.contains("Origin"))
+            m_job->addMetaData("Origin", origin);
+    }
+
+    for (auto it = m_headers.cbegin(); it != m_headers.cend(); ++it)
+        m_job->addMetaData(it.key(), it.value());
 
     connect(m_job, &KJob::percentChanged,         this, &DownloadItem::onPercent);
     connect(m_job, &KJob::result,                 this, &DownloadItem::onResult);
@@ -77,6 +111,10 @@ void DownloadItem::startJob(bool resume)
 
 QJsonObject DownloadItem::toJson() const
 {
+    QJsonObject headersObj;
+    for (auto it = m_headers.cbegin(); it != m_headers.cend(); ++it)
+        headersObj.insert(it.key(), it.value());
+
     return {
         { "label",         m_label                  },
         { "url",           m_url.toString()         },
@@ -85,6 +123,7 @@ QJsonObject DownloadItem::toJson() const
         { "totalBytes",    m_totalBytes             },
         { "receivedBytes", m_receivedBytes          },
         { "state",         stateToString(m_state)   },
+        { "headers",       headersObj               },
     };
 }
 
@@ -128,6 +167,23 @@ void DownloadItem::cancel()
         return;
     setState(State::Canceled);
     m_job->kill(KJob::EmitResult);
+}
+
+void DownloadItem::reveal()
+{
+    if (m_destination.isEmpty() || !m_destination.isValid())
+        return;
+    KIO::highlightInFileManager({m_destination});
+}
+
+void DownloadItem::open()
+{
+    if (m_state != State::Finished)
+        return;
+    if (m_destination.isEmpty() || !m_destination.isValid())
+        return;
+    auto *job = new KIO::OpenUrlJob(m_destination, this);
+    job->start();
 }
 
 void DownloadItem::onPercent(KJob * /*job*/, ulong percent)

@@ -20,6 +20,14 @@ void DownloadModel::setJsonPath(const QString &path)
     load();
 }
 
+void DownloadModel::setUserAgent(const QString &userAgent)
+{
+    if (m_userAgent == userAgent)
+        return;
+    m_userAgent = userAgent;
+    emit userAgentChanged();
+}
+
 static QString localPath(const QString &path)
 {
     const QUrl url(path);
@@ -46,7 +54,7 @@ void DownloadModel::load()
         if (!val.isObject())
             continue;
 
-        DownloadItem *item = DownloadItem::fromJson(val.toObject(), this);
+        DownloadItem *item = DownloadItem::fromJson(val.toObject(), m_userAgent, this);
         if (!item)
             continue;
 
@@ -124,7 +132,18 @@ QHash<int, QByteArray> DownloadModel::roleNames() const
     };
 }
 
-void DownloadModel::add(const QUrl &url, const QUrl &destination, const QString &label)
+QMap<QString,QString> DownloadModel::toStringMap(const QVariantMap &m)
+{
+    QMap<QString,QString> result;
+    for (auto it = m.cbegin(); it != m.cend(); ++it)
+        result.insert(it.key(), it.value().toString());
+    return result;
+}
+
+void DownloadModel::add(const QUrl        &url,
+                        const QUrl        &destination,
+                        const QString     &label,
+                        const QVariantMap &headers)
 {
     const QUrl resolvedDest = destination.scheme().isEmpty()
         ? QUrl::fromLocalFile(destination.path())
@@ -134,7 +153,8 @@ void DownloadModel::add(const QUrl &url, const QUrl &destination, const QString 
         ? QFileInfo(url.path()).fileName()
         : label;
 
-    auto *item = new DownloadItem(resolvedLabel, url, resolvedDest, this);
+    auto *item = new DownloadItem(resolvedLabel, url, resolvedDest,
+                                  m_userAgent, toStringMap(headers), this);
     connectItem(item);
 
     const int row = m_items.size();
@@ -195,6 +215,18 @@ void DownloadModel::cancel(int index)
         m_items.at(index)->cancel();
 }
 
+void DownloadModel::open(int index)
+{
+    if (indexValid(index))
+        m_items.at(index)->open();
+}
+
+void DownloadModel::reveal(int index)
+{
+    if (indexValid(index))
+        m_items.at(index)->reveal();
+}
+
 int DownloadModel::indexOfUrl(const QUrl &url) const
 {
     for (int i = 0; i < m_items.size(); ++i)
@@ -239,7 +271,22 @@ void DownloadModel::onItemStateChanged()
 
     const QModelIndex idx = index(row);
     emit dataChanged(idx, idx, { StateRole });
+
+    DownloadItem *item = m_items.at(row);
+    if (item->state() == DownloadItem::State::Finished) {
+        emit downloadFinished(row, true);
+    } else if (item->state() == DownloadItem::State::Canceled) {
+        emit downloadFinished(row, false);
+    }
+
     save();
+}
+
+DownloadItem *DownloadModel::get(int index) const
+{
+    if (indexValid(index))
+        return m_items.at(index);
+    return nullptr;
 }
 
 bool DownloadModel::indexValid(int i) const

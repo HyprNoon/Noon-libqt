@@ -1,3 +1,8 @@
+### TODO 
+- [ ] Refine lifecycle of downloads
+- [ ] add on finished callback
+- [ ] add reveal function 
+
 # Downloader Components
 
 ## Overview

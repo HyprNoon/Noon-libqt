@@ -3,6 +3,7 @@
 #include <QString>
 #include <QUrl>
 #include <QJsonObject>
+#include <QMap>
 #include <qqmlintegration.h>
 #include <KIO/FileCopyJob>
 
@@ -30,12 +31,16 @@ public:
     };
     Q_ENUM(State)
 
-    explicit DownloadItem(const QString &label,
-                          const QUrl    &url,
-                          const QUrl    &destination,
-                          QObject       *parent = nullptr);
+    explicit DownloadItem(const QString              &label,
+                          const QUrl                 &url,
+                          const QUrl                 &destination,
+                          const QString              &userAgent = {},
+                          const QMap<QString,QString> &headers  = {},
+                          QObject                    *parent    = nullptr);
 
-    static DownloadItem *fromJson(const QJsonObject &obj, QObject *parent = nullptr);
+    static DownloadItem *fromJson(const QJsonObject &obj,
+                                  const QString     &userAgent = {},
+                                  QObject           *parent    = nullptr);
 
     ~DownloadItem() override = default;
 
@@ -54,6 +59,8 @@ public:
     void pause();
     void resume();
     void cancel();
+    Q_INVOKABLE void reveal();
+    Q_INVOKABLE void open();
 
 signals:
     void progressChanged(int progress);
@@ -73,14 +80,16 @@ private slots:
     void onSpeedChanged(KJob *job, ulong bytesPerSecond);
 
 private:
-    explicit DownloadItem(const QString &label,
-                          const QUrl    &url,
-                          const QUrl    &destination,
-                          int            restoredProgress,
-                          qint64         restoredTotal,
-                          qint64         restoredReceived,
-                          State          restoredState,
-                          QObject       *parent);
+    explicit DownloadItem(const QString              &label,
+                          const QUrl                 &url,
+                          const QUrl                 &destination,
+                          int                         restoredProgress,
+                          qint64                      restoredTotal,
+                          qint64                      restoredReceived,
+                          State                       restoredState,
+                          const QString              &userAgent,
+                          const QMap<QString,QString> &headers,
+                          QObject                    *parent);
 
     void startJob(bool resume);
     void setState(State s);
@@ -89,9 +98,11 @@ private:
     static State   stateFromString(const QString &s);
     static QString stateToString(State s);
 
-    QString           m_label;
-    QUrl              m_url;
-    QUrl              m_destination;
+    QString              m_label;
+    QUrl                 m_url;
+    QUrl                 m_destination;
+    QString              m_userAgent;
+    QMap<QString,QString> m_headers;
     int               m_progress      = 0;
     int               m_lastSaved     = 0;
     State             m_state         = State::Queued;

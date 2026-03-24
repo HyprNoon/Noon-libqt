@@ -18,6 +18,8 @@ target_link_libraries(noon_utils_download PRIVATE
     Qt6::Qml
     Qt6::Quick
     KF6::KIOCore
+    KF6::KIOWidgets
+    KF6::KIOGui
 )
 
 if(NOT QML_INSTALL_DIR)
