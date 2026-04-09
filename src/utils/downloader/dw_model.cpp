@@ -6,17 +6,36 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QDir>
+#include <QUrl>
+
+static QString localPath(const QString &path)
+{
+    const QUrl url(path);
+    return url.isLocalFile() ? url.toLocalFile() : path;
+}
 
 DownloadModel::DownloadModel(QObject *parent)
     : QAbstractListModel(parent)
-{}
+{
+    connect(&m_watcher, &QFileSystemWatcher::fileChanged,
+            this, &DownloadModel::onFileChanged);
+}
 
 void DownloadModel::setJsonPath(const QString &path)
 {
     if (m_jsonPath == path)
         return;
+
+    if (!m_jsonPath.isEmpty())
+        m_watcher.removePath(localPath(m_jsonPath));
+
     m_jsonPath = path;
     emit jsonPathChanged();
+
+    const QString local = localPath(m_jsonPath);
+    if (QFileInfo::exists(local))
+        m_watcher.addPath(local);
+
     load();
 }
 
@@ -26,12 +45,6 @@ void DownloadModel::setUserAgent(const QString &userAgent)
         return;
     m_userAgent = userAgent;
     emit userAgentChanged();
-}
-
-static QString localPath(const QString &path)
-{
-    const QUrl url(path);
-    return url.isLocalFile() ? url.toLocalFile() : path;
 }
 
 void DownloadModel::load()
@@ -69,12 +82,67 @@ void DownloadModel::load()
         emit countChanged();
 }
 
-void DownloadModel::save() const
+
+void DownloadModel::reload()
 {
     if (m_jsonPath.isEmpty())
         return;
 
-    QDir().mkpath(QFileInfo(localPath(m_jsonPath)).absolutePath());
+    QFile file(localPath(m_jsonPath));
+    if (!file.exists() || !file.open(QIODevice::ReadOnly))
+        return;
+
+    const QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+    file.close();
+
+    if (!doc.isObject())
+        return;
+
+    const QJsonArray arr = doc.object().value("downloads").toArray();
+
+    // Signal that the entire model is changing
+    beginResetModel();
+
+    // Clean up existing items
+    qDeleteAll(m_items);
+    m_items.clear();
+
+    // Rebuild from JSON
+    for (const QJsonValue &val : arr) {
+        if (!val.isObject())
+            continue;
+
+        DownloadItem *item = DownloadItem::fromJson(val.toObject(), m_userAgent, this);
+        if (item) {
+            connectItem(item);
+            m_items.append(item);
+        }
+    }
+
+    endResetModel();
+
+    emit countChanged();
+    m_watcher.addPath(localPath(m_jsonPath));
+}
+
+void DownloadModel::onFileChanged(const QString &path)
+{
+    Q_UNUSED(path)
+    if (m_ignoreNextChange) {
+        m_ignoreNextChange = false;
+        m_watcher.addPath(localPath(m_jsonPath));
+        return;
+    }
+    reload();
+}
+
+void DownloadModel::save()
+{
+    if (m_jsonPath.isEmpty())
+        return;
+
+    const QString local = localPath(m_jsonPath);
+    QDir().mkpath(QFileInfo(local).absolutePath());
 
     QJsonArray arr;
     for (const DownloadItem *item : m_items)
@@ -82,9 +150,11 @@ void DownloadModel::save() const
 
     QJsonDocument doc(QJsonObject{{ "downloads", arr }});
 
-    QFile file(localPath(m_jsonPath));
-    if (file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+    QFile file(local);
+    if (file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        m_ignoreNextChange = true;
         file.write(doc.toJson(QJsonDocument::Indented));
+    }
 }
 
 int DownloadModel::rowCount(const QModelIndex &parent) const
@@ -102,17 +172,18 @@ QVariant DownloadModel::data(const QModelIndex &index, int role) const
     const DownloadItem *item = m_items.at(index.row());
 
     switch (role) {
-    case LabelRole:         return item->label();
-    case UrlRole:           return item->url();
-    case DestinationRole:   return item->destination();
-    case ProgressRole:      return item->progress();
-    case StateRole:         return QVariant::fromValue(item->state());
-    case ItemRole:          return QVariant::fromValue(item);
-    case TotalBytesRole:    return item->totalBytes();
-    case ReceivedBytesRole: return item->receivedBytes();
-    case SpeedRole:         return item->speed();
-    case EtaRole:           return item->eta();
-    default:                return {};
+    case LabelRole:          return item->label();
+    case UrlRole:            return item->url();
+    case DestinationRole:    return item->destination();
+    case ProgressRole:       return item->progress();
+    case StateRole:          return QVariant::fromValue(item->state());
+    case ItemRole:           return QVariant::fromValue(item);
+    case TotalBytesRole:     return item->totalBytes();
+    case ReceivedBytesRole:  return item->receivedBytes();
+    case SpeedRole:          return item->speed();
+    case EtaRole:            return item->eta();
+    case IsNoonRole:         return item->isNoon();
+    default:                 return {};
     }
 }
 
@@ -129,6 +200,7 @@ QHash<int, QByteArray> DownloadModel::roleNames() const
         { ReceivedBytesRole, "receivedBytes" },
         { SpeedRole,         "speed"         },
         { EtaRole,           "eta"           },
+        { IsNoonRole,        "isNoon"        },
     };
 }
 
@@ -140,10 +212,7 @@ QMap<QString,QString> DownloadModel::toStringMap(const QVariantMap &m)
     return result;
 }
 
-void DownloadModel::add(const QUrl        &url,
-                        const QUrl        &destination,
-                        const QString     &label,
-                        const QVariantMap &headers)
+void DownloadModel::add(const QUrl &url, const QUrl &destination, const QString &label, const QVariantMap &headers)
 {
     const QUrl resolvedDest = destination.scheme().isEmpty()
         ? QUrl::fromLocalFile(destination.path())
@@ -153,8 +222,7 @@ void DownloadModel::add(const QUrl        &url,
         ? QFileInfo(url.path()).fileName()
         : label;
 
-    auto *item = new DownloadItem(resolvedLabel, url, resolvedDest,
-                                  m_userAgent, toStringMap(headers), this);
+    auto *item = new DownloadItem(resolvedLabel, url, resolvedDest, m_userAgent, toStringMap(headers), this);
     connectItem(item);
 
     const int row = m_items.size();
@@ -168,7 +236,7 @@ void DownloadModel::add(const QUrl        &url,
 
 void DownloadModel::remove(int index)
 {
-    if (!indexValid(index))
+    if (!indexValid(index) || !m_items.at(index)->isNoon())
         return;
 
     beginRemoveRows({}, index, index);
@@ -184,7 +252,7 @@ void DownloadModel::remove(int index)
 
 void DownloadModel::dismiss(int index)
 {
-    if (!indexValid(index))
+    if (!indexValid(index) || !m_items.at(index)->isNoon())
         return;
 
     beginRemoveRows({}, index, index);
@@ -199,19 +267,19 @@ void DownloadModel::dismiss(int index)
 
 void DownloadModel::pause(int index)
 {
-    if (indexValid(index))
+    if (indexValid(index) && m_items.at(index)->isNoon())
         m_items.at(index)->pause();
 }
 
 void DownloadModel::resume(int index)
 {
-    if (indexValid(index))
+    if (indexValid(index) && m_items.at(index)->isNoon())
         m_items.at(index)->resume();
 }
 
 void DownloadModel::cancel(int index)
 {
-    if (indexValid(index))
+    if (indexValid(index) && m_items.at(index)->isNoon())
         m_items.at(index)->cancel();
 }
 
@@ -284,9 +352,7 @@ void DownloadModel::onItemStateChanged()
 
 DownloadItem *DownloadModel::get(int index) const
 {
-    if (indexValid(index))
-        return m_items.at(index);
-    return nullptr;
+    return indexValid(index) ? m_items.at(index) : nullptr;
 }
 
 bool DownloadModel::indexValid(int i) const

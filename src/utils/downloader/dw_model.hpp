@@ -1,6 +1,7 @@
 #pragma once
 #include "dw_item.hpp"
 #include <QAbstractListModel>
+#include <QFileSystemWatcher>
 #include <QList>
 #include <QUrl>
 #include <QMap>
@@ -24,7 +25,8 @@ public:
         TotalBytesRole,
         ReceivedBytesRole,
         SpeedRole,
-        EtaRole
+        EtaRole,
+        IsNoonRole,
     };
     Q_ENUM(Roles)
 
@@ -41,9 +43,9 @@ public:
     void setJsonPath(const QString &path);
     void setUserAgent(const QString &userAgent);
 
-    Q_INVOKABLE void add(const QUrl    &url,
-                         const QUrl    &destination,
-                         const QString &label   = {},
+    Q_INVOKABLE void add(const QUrl        &url,
+                         const QUrl        &destination,
+                         const QString     &label   = {},
                          const QVariantMap &headers = {});
     Q_INVOKABLE void remove(int index);
     Q_INVOKABLE void dismiss(int index);
@@ -66,17 +68,20 @@ private slots:
     void onItemDataChanged();
     void onItemBytesChanged();
     void onItemStateChanged();
+    void onFileChanged(const QString &path);
 
 private:
     void load();
-    void save() const;
+    void reload();
+    void save();
     bool indexValid(int i)         const;
     int  rowOf(DownloadItem *item) const;
     void connectItem(DownloadItem *item);
-
     static QMap<QString,QString> toStringMap(const QVariantMap &m);
 
     QList<DownloadItem *> m_items;
     QString               m_jsonPath;
     QString               m_userAgent;
+    QFileSystemWatcher    m_watcher;
+    bool                  m_ignoreNextChange = false;
 };

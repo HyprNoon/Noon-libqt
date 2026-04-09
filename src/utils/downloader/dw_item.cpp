@@ -11,7 +11,7 @@ DownloadItem::DownloadItem(const QString              &label,
                            const QString              &userAgent,
                            const QMap<QString,QString> &headers,
                            QObject                    *parent)
-    : DownloadItem(label, url, destination, 0, 0, 0, State::Queued, userAgent, headers, parent)
+    : DownloadItem(label, url, destination, 0, 0, 0, State::Queued, userAgent, headers, "noon", parent)
 {}
 
 DownloadItem::DownloadItem(const QString              &label,
@@ -23,6 +23,7 @@ DownloadItem::DownloadItem(const QString              &label,
                            State                       restoredState,
                            const QString              &userAgent,
                            const QMap<QString,QString> &headers,
+                           const QString              &signiture,
                            QObject                    *parent)
     : QObject(parent)
     , m_label(label)
@@ -30,11 +31,15 @@ DownloadItem::DownloadItem(const QString              &label,
     , m_destination(destination)
     , m_userAgent(userAgent)
     , m_headers(headers)
+    , m_signiture(signiture)
     , m_progress(restoredProgress)
     , m_state(restoredState)
     , m_totalBytes(restoredTotal)
     , m_receivedBytes(restoredReceived)
 {
+    if (!isNoon())
+        return;
+
     if (m_state == State::Canceled || m_state == State::Finished)
         return;
 
@@ -56,6 +61,7 @@ DownloadItem *DownloadItem::fromJson(const QJsonObject &obj,
     const qint64  totalBytes    = obj.value("totalBytes").toInteger(0);
     const qint64  receivedBytes = obj.value("receivedBytes").toInteger(0);
     const State   state         = stateFromString(obj.value("state").toString());
+    const QString signiture     = obj.value("signiture").toString();
 
     QMap<QString,QString> headers;
     const QJsonObject     headersObj = obj.value("headers").toObject();
@@ -67,7 +73,7 @@ DownloadItem *DownloadItem::fromJson(const QJsonObject &obj,
 
     return new DownloadItem(label, url, destination,
                             progress, totalBytes, receivedBytes,
-                            state, userAgent, headers, parent);
+                            state, userAgent, headers, signiture, parent);
 }
 
 void DownloadItem::startJob(bool resume)
@@ -124,6 +130,7 @@ QJsonObject DownloadItem::toJson() const
         { "receivedBytes", m_receivedBytes          },
         { "state",         stateToString(m_state)   },
         { "headers",       headersObj               },
+        { "signiture",     m_signiture              },
     };
 }
 
@@ -149,21 +156,21 @@ QString DownloadItem::stateToString(State s)
 
 void DownloadItem::pause()
 {
-    if (m_state != State::Running || !m_job)
+    if (!isNoon() || m_state != State::Running || !m_job)
         return;
     m_job->suspend();
 }
 
 void DownloadItem::resume()
 {
-    if (m_state != State::Paused || !m_job)
+    if (!isNoon() || m_state != State::Paused || !m_job)
         return;
     m_job->resume();
 }
 
 void DownloadItem::cancel()
 {
-    if (m_state == State::Canceled || !m_job)
+    if (!isNoon() || m_state == State::Canceled || !m_job)
         return;
     setState(State::Canceled);
     m_job->kill(KJob::EmitResult);
@@ -178,9 +185,9 @@ void DownloadItem::reveal()
 
 void DownloadItem::open()
 {
-    if (m_state != State::Finished)
-        return;
     if (m_destination.isEmpty() || !m_destination.isValid())
+        return;
+    if (isNoon() && m_state != State::Finished)
         return;
     auto *job = new KIO::OpenUrlJob(m_destination, this);
     job->start();

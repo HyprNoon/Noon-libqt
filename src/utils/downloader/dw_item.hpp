@@ -21,6 +21,7 @@ class DownloadItem : public QObject
     Q_PROPERTY(qint64  receivedBytes READ receivedBytes NOTIFY receivedBytesChanged)
     Q_PROPERTY(qint64  speed         READ speed         NOTIFY speedChanged)
     Q_PROPERTY(int     eta           READ eta           NOTIFY etaChanged)
+    Q_PROPERTY(bool    isNoon        READ isNoon        CONSTANT)
 public:
     enum class State {
         Queued,
@@ -53,6 +54,7 @@ public:
     qint64  receivedBytes() const { return m_receivedBytes; }
     qint64  speed()         const { return m_speed;         }
     int     eta()           const { return m_eta;           }
+    bool    isNoon()        const { return m_signiture == QStringLiteral("noon"); }
 
     QJsonObject toJson() const;
 
@@ -89,6 +91,7 @@ private:
                           State                       restoredState,
                           const QString              &userAgent,
                           const QMap<QString,QString> &headers,
+                          const QString              &signiture,
                           QObject                    *parent);
 
     void startJob(bool resume);
@@ -103,6 +106,7 @@ private:
     QUrl                 m_destination;
     QString              m_userAgent;
     QMap<QString,QString> m_headers;
+    QString           m_signiture;
     int               m_progress      = 0;
     int               m_lastSaved     = 0;
     State             m_state         = State::Queued;
