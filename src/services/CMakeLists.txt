@@ -5,18 +5,17 @@ qt_add_qml_module(noon_services
     SOURCES
         clipboard.hpp
         clipboard.cpp
-        resources.hpp
-        resources.cpp
 )
 
 target_link_libraries(noon_services PRIVATE
     Qt6::Quick
     Qt6::Sql
     Qt6::Concurrent
+    Qt6::Widgets
 )
 
 if(NOT QML_INSTALL_DIR)
-    set(QML_INSTALL_DIR "${QT6_INSTALL_PREFIX}/lib/qt6/qml" CACHE PATH "QML install dir")
+  set(QML_INSTALL_DIR "${QT6_INSTALL_PREFIX}/lib/qt6/qml" CACHE PATH "QML install dir")
 endif()
 
 install(TARGETS noon_services noon_servicesplugin DESTINATION "${QML_INSTALL_DIR}/Noon/Services")

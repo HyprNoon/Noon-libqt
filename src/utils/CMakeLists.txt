@@ -1,3 +1,6 @@
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(DEPS REQUIRED libdrm nvidia-ml)
+
 qt_add_qml_module(noon_utils
     URI Noon.Utils
     VERSION 1.0
@@ -9,24 +12,42 @@ qt_add_qml_module(noon_utils
         cava_watcher.cpp
         hyprparser.hpp
         hyprparser.cpp
+        resources_watcher.hpp
+        resources_watcher.cpp
+)
+
+target_include_directories(noon_utils PRIVATE
+    ${DEPS_INCLUDE_DIRS}
 )
 
 target_link_libraries(noon_utils PRIVATE
     Qt6::Quick
-    Qt6::Sql
     Qt6::Concurrent
+    Qt6::Widgets
+    ${DEPS_LIBRARIES}
 )
 
 # Installation
 if(NOT QML_INSTALL_DIR)
-    set(QML_INSTALL_DIR "${QT6_INSTALL_PREFIX}/lib/qt6/qml" CACHE PATH "QML install dir")
+  set(QML_INSTALL_DIR "${QT6_INSTALL_PREFIX}/lib/qt6/qml"
+        CACHE PATH "QML install dir")
 endif()
 
-install(TARGETS noon_utils noon_utilsplugin DESTINATION "${QML_INSTALL_DIR}/Noon/Utils")
-qt_query_qml_module(noon_utils QMLDIR qmldir_utils TYPEINFO typeinfo_utils)
-install(FILES ${qmldir_utils} ${typeinfo_utils} DESTINATION "${QML_INSTALL_DIR}/Noon/Utils")
+install(
+    TARGETS noon_utils noon_utilsplugin
+    DESTINATION "${QML_INSTALL_DIR}/Noon/Utils"
+)
 
-add_subdirectory(latex)
+qt_query_qml_module(noon_utils
+    QMLDIR    qmldir_utils
+    TYPEINFO typeinfo_utils
+)
+
+install(
+    FILES ${qmldir_utils} ${typeinfo_utils}
+    DESTINATION "${QML_INSTALL_DIR}/Noon/Utils"
+)
+
 add_subdirectory(qr)
 add_subdirectory(downloader)
 add_subdirectory(dialogs)
