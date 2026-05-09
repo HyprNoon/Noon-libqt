@@ -14,6 +14,8 @@ qt_add_qml_module(noon_utils
         hyprparser.cpp
         resources_watcher.hpp
         resources_watcher.cpp
+        sql_reader.hpp
+
 )
 
 target_include_directories(noon_utils PRIVATE
@@ -22,6 +24,7 @@ target_include_directories(noon_utils PRIVATE
 
 target_link_libraries(noon_utils PRIVATE
     Qt6::Quick
+    Qt6::Sql
     Qt6::Concurrent
     Qt6::Widgets
     ${DEPS_LIBRARIES}
