@@ -11,7 +11,6 @@ qt_add_qml_module(noon_utils
         cava_watcher.hpp
         cava_watcher.cpp
         hyprparser.hpp
-        hyprparser.cpp
         resources_watcher.hpp
         resources_watcher.cpp
         sql_reader.hpp
