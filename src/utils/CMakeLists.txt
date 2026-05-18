@@ -15,6 +15,7 @@ qt_add_qml_module(noon_utils
         resources_watcher.cpp
         sql_reader.hpp
         fs_watcher.hpp
+        qml_crawler.hpp
 )
 
 target_include_directories(noon_utils PRIVATE
