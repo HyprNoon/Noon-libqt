@@ -1,6 +1,5 @@
 add_subdirectory(lib/qtqr)
 add_subdirectory(utils)
-add_subdirectory(services)
 
 qt_add_qml_module(noon
     URI Noon

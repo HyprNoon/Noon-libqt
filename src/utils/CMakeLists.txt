@@ -1,21 +1,17 @@
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(DEPS REQUIRED libdrm nvidia-ml)
+pkg_check_modules(DEPS REQUIRED libdrm nvidia-ml sdl2)
 
 qt_add_qml_module(noon_utils
     URI Noon.Utils
     VERSION 1.0
     OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/Noon/Utils"
     SOURCES
-        highlighter.hpp
-        highlighter.cpp
-        cava_watcher.hpp
-        cava_watcher.cpp
-        hyprparser.hpp
-        resources_watcher.hpp
-        resources_watcher.cpp
-        sql_reader.hpp
-        fs_watcher.hpp
-        qml_crawler.hpp
+        CavaWatcher.hpp
+        ClipboardManager.hpp
+        ResourcesWatcher.hpp
+        FileSystemWatcher.hpp
+        SQLReader.hpp
+        QMLCrawler.hpp
 )
 
 target_include_directories(noon_utils PRIVATE
@@ -30,7 +26,6 @@ target_link_libraries(noon_utils PRIVATE
     ${DEPS_LIBRARIES}
 )
 
-# Installation
 if(NOT QML_INSTALL_DIR)
   set(QML_INSTALL_DIR "${QT6_INSTALL_PREFIX}/lib/qt6/qml"
         CACHE PATH "QML install dir")
@@ -51,6 +46,8 @@ install(
     DESTINATION "${QML_INSTALL_DIR}/Noon/Utils"
 )
 
+add_subdirectory(hypr)
+add_subdirectory(devices)
 add_subdirectory(qr)
 add_subdirectory(downloader)
 add_subdirectory(dialogs)
