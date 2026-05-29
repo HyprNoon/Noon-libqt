@@ -1,12 +1,12 @@
+find_package(CURL REQUIRED)
+
 qt_add_qml_module(noon_utils_download
     URI Noon.Utils.Download
     VERSION 1.0
     OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/Noon/Utils/Download"
     SOURCES
-        dw_item.cpp
-        dw_item.hpp
-        dw_model.cpp
-        dw_model.hpp
+        DownloadItem.hpp
+        DownloadModel.hpp
 )
 
 target_include_directories(noon_utils_download PRIVATE
@@ -17,9 +17,7 @@ target_link_libraries(noon_utils_download PRIVATE
     Qt6::Core
     Qt6::Qml
     Qt6::Quick
-    KF6::KIOCore
-    KF6::KIOWidgets
-    KF6::KIOGui
+    CURL::libcurl
 )
 
 if(NOT QML_INSTALL_DIR)

@@ -46,6 +46,7 @@ install(
     DESTINATION "${QML_INSTALL_DIR}/Noon/Utils"
 )
 
+add_subdirectory(network)
 add_subdirectory(hypr)
 add_subdirectory(devices)
 add_subdirectory(qr)
