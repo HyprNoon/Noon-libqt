@@ -6,7 +6,6 @@
 #include <QFile>
 #include <QUrl>
 #include <vector>
-#include <algorithm>
 #include <QtQml/qqmlregistration.h>
 
 class CavaWatcher : public QObject {

@@ -1,4 +1,5 @@
 find_package(PkgConfig REQUIRED)
+find_package(MpvQt REQUIRED)
 pkg_check_modules(DEPS REQUIRED libdrm nvidia-ml sdl2)
 
 qt_add_qml_module(noon_utils
@@ -12,6 +13,8 @@ qt_add_qml_module(noon_utils
         FileSystemWatcher.hpp
         SQLReader.hpp
         QMLCrawler.hpp
+        EnvManager.hpp
+        MpvPlayer.hpp
 )
 
 target_include_directories(noon_utils PRIVATE
@@ -23,6 +26,7 @@ target_link_libraries(noon_utils PRIVATE
     Qt6::Sql
     Qt6::Concurrent
     Qt6::Widgets
+    MpvQt::MpvQt
     ${DEPS_LIBRARIES}
 )
 
@@ -46,9 +50,10 @@ install(
     DESTINATION "${QML_INSTALL_DIR}/Noon/Utils"
 )
 
+add_subdirectory(latex)
+# add_subdirectory(downloader)
 add_subdirectory(network)
 add_subdirectory(hypr)
 add_subdirectory(devices)
 add_subdirectory(qr)
-add_subdirectory(downloader)
 add_subdirectory(dialogs)

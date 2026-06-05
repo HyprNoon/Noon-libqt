@@ -63,7 +63,6 @@ private:
     void                                rewireStats();
     void                                updateSpeed();
     static QString                      fmtSpeed(qreal bps);
-
     QSet<QString>                           m_hookedDevices;
     QTimer                                  m_speedTimer;
     NetworkManager::DeviceStatistics::Ptr   m_devStats;
