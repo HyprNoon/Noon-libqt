@@ -96,11 +96,17 @@ public:
 
     Q_INVOKABLE void preRender(const QString &e) {
         if (e.isEmpty()) return;
-        (void)QtConcurrent::run([this, e] {
-            QString h = computeHash(e, m_textSize, m_foreground);
-            if (m_cacheEnabled && !loadFromCache(h).isNull()) { Q_EMIT cached(h, cacheFilePath(h)); return; }
-            QImage img = renderExpression(e, m_textSize, m_foreground, m_background);
-            if (!img.isNull() && m_cacheEnabled) { saveToCache(h, img); Q_EMIT cached(h, cacheFilePath(h)); }
+        auto self = QPointer<LatexRenderer>(this);
+        QString expr = e;
+        qreal size = m_textSize;
+        QColor fg = m_foreground, bg = m_background;
+        bool cache = m_cacheEnabled;
+        (void)QtConcurrent::run([self, expr, size, fg, bg, cache] {
+            if (!self) return;
+            QString h = self->computeHash(expr, size, fg);
+            if (cache && !self->loadFromCache(h).isNull()) { Q_EMIT self->cached(h, self->cacheFilePath(h)); return; }
+            QImage img = self->renderExpression(expr, size, fg, bg);
+            if (!img.isNull() && cache) { self->saveToCache(h, img); Q_EMIT self->cached(h, self->cacheFilePath(h)); }
         });
     }
 
@@ -163,31 +169,39 @@ private:
     QImage renderExpression(const QString &expr, qreal size, const QColor &fg, const QColor &bg)
     {
         if (expr.isEmpty()) return {};
-        std::lock_guard<std::mutex> lock(s_renderMutex);
         try {
             tex::Formula formula(expr.toStdWString());
-            auto *render = tex::TeXRenderBuilder{}
-                .setStyle(tex::TexStyle::display)
-                .setTextSize(static_cast<float>(size))
-                .setWidth(tex::UnitType::pixel, 2000.f, tex::Alignment::left)
-                .setIsMaxWidth(true)
-                .setLineSpace(tex::UnitType::pixel, static_cast<float>(size / 3.))
-                .setForeground(((tex::color)(fg.alpha()) << 24) | ((tex::color)(fg.red()) << 16) | ((tex::color)(fg.green()) << 8) | (tex::color)(fg.blue()))
-                .build(formula);
-            if (!render) return {};
+            tex::TeXRender *render;
+            int w, h;
+            Cairo::RefPtr<Cairo::ImageSurface> surface;
+            Cairo::RefPtr<Cairo::Context> cr;
 
-            int w = render->getWidth(), h = render->getHeight();
-            if (w < 1 || h < 1) { delete render; return {}; }
+            {
+                std::lock_guard<std::mutex> lock(s_renderMutex);
+                render = tex::TeXRenderBuilder{}
+                    .setStyle(tex::TexStyle::display)
+                    .setTextSize(static_cast<float>(size))
+                    .setWidth(tex::UnitType::pixel, 2000.f, tex::Alignment::left)
+                    .setIsMaxWidth(true)
+                    .setLineSpace(tex::UnitType::pixel, static_cast<float>(size / 3.))
+                    .setForeground(((tex::color)(fg.alpha()) << 24) | ((tex::color)(fg.red()) << 16) | ((tex::color)(fg.green()) << 8) | (tex::color)(fg.blue()))
+                    .build(formula);
+                if (!render) return {};
 
-            auto surface = Cairo::ImageSurface::create(Cairo::FORMAT_ARGB32, w, h);
-            auto cr = Cairo::Context::create(surface);
+                w = render->getWidth();
+                h = render->getHeight();
+                if (w < 1 || h < 1) { delete render; return {}; }
 
-            if (bg.alpha() > 0) {
-                cr->save(); cr->set_source_rgba(bg.redF(), bg.greenF(), bg.blueF(), bg.alphaF()); cr->paint(); cr->restore();
+                surface = Cairo::ImageSurface::create(Cairo::FORMAT_ARGB32, w, h);
+                cr = Cairo::Context::create(surface);
+
+                if (bg.alpha() > 0) {
+                    cr->save(); cr->set_source_rgba(bg.redF(), bg.greenF(), bg.blueF(), bg.alphaF()); cr->paint(); cr->restore();
+                }
+
+                tex::Graphics2D_cairo g2(cr);
+                render->draw(g2, 0, 0);
             }
-
-            tex::Graphics2D_cairo g2(cr);
-            render->draw(g2, 0, 0);
 
             QImage img(surface->get_data(), w, h, surface->get_stride(), QImage::Format_ARGB32);
             QImage copy = img.copy();
@@ -225,7 +239,11 @@ private:
         QString dir = cacheDir(); QDir().mkpath(dir);
         QString path = dir + "/" + hash + ".png";
         if (QFile::exists(path)) return;
-        img.save(path, "PNG");
+        QString tmp = dir + "/." + hash + ".tmp";
+        if (img.save(tmp, "PNG"))
+            QFile::rename(tmp, path);
+        else
+            QFile::remove(tmp);
     }
 
     QString m_expression;
