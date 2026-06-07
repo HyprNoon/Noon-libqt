@@ -50,10 +50,7 @@ install(
     DESTINATION "${QML_INSTALL_DIR}/Noon/Utils"
 )
 
+#add_subdirectory(cef)
 add_subdirectory(latex)
-# add_subdirectory(downloader)
-add_subdirectory(network)
-add_subdirectory(hypr)
-add_subdirectory(devices)
 add_subdirectory(qr)
 add_subdirectory(dialogs)

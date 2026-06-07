@@ -1,5 +1,9 @@
 add_subdirectory(lib/qtqr)
 add_subdirectory(utils)
+add_subdirectory(protocols)
+add_subdirectory(network)
+add_subdirectory(hypr)
+add_subdirectory(devices)
 
 qt_add_qml_module(noon
     URI Noon
@@ -10,7 +14,7 @@ qt_add_qml_module(noon
 target_link_libraries(noon PRIVATE Qt6::Quick)
 
 if(NOT QML_INSTALL_DIR)
-    set(QML_INSTALL_DIR "${QT6_INSTALL_PREFIX}/lib/qt6/qml" CACHE PATH "QML install dir")
+  set(QML_INSTALL_DIR "${QT6_INSTALL_PREFIX}/lib/qt6/qml" CACHE PATH "QML install dir")
 endif()
 
 install(TARGETS noon noonplugin DESTINATION "${QML_INSTALL_DIR}/Noon")
