@@ -65,6 +65,7 @@ signals:
     void activeWorkspaceChanged();
     void monitorsChanged();
     void currentKeyboardLayoutChanged();
+    void activeWindowChanged(const QString &className, const QString &title);
 
 private:
     QString      m_socketPath;
@@ -188,6 +189,10 @@ private:
             else if (ok)
                 m_activeWorkspace = QJsonObject{{ "id", wsId }, { "name", key }};
             emit activeWorkspaceChanged();
+        } else if (event == "activewindow") {
+            int sep = data.indexOf(',');
+            if (sep != -1)
+                emit activeWindowChanged(data.left(sep).trimmed(), data.mid(sep + 1).trimmed());
         } else if (event == "activelayout") {
             const int sep = data.indexOf(',');
             if (sep != -1) {

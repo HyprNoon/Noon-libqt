@@ -5,6 +5,8 @@ qt_add_qml_module(noon_hypr
     SOURCES
     HyprBridge.hpp
     HyprParser.hpp
+    ScreenTimeManager.hpp
+    ScreenTimeManager.cpp
 )
 
 find_package(Qt6 REQUIRED COMPONENTS Core Network Concurrent)
