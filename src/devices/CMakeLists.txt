@@ -13,4 +13,4 @@ target_link_libraries(noon_devices PRIVATE
     Qt6::Quick
     SDL2::SDL2
 )
-noon_install_qml(noon_devices Noon.Devices)
+noon_setup(noon_devices Noon.Devices)

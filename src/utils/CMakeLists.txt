@@ -29,7 +29,7 @@ target_link_libraries(noon_utils PRIVATE
     MpvQt::MpvQt
     ${DEPS_LIBRARIES}
 )
-noon_install_qml(noon_utils Noon.Utils)
+noon_setup(noon_utils Noon.Utils)
 
 #add_subdirectory(cef)
 add_subdirectory(latex)

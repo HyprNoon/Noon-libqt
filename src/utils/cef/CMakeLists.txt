@@ -27,4 +27,4 @@ set_target_properties(noon_utils_cef PROPERTIES
     INSTALL_RPATH "${QCEFVIEW_DIR}/bin"
     BUILD_RPATH "${QCEFVIEW_DIR}/bin"
 )
-noon_install_qml(noon_utils_cef Noon.Utils.Cef)
+noon_setup(noon_utils_cef Noon.Utils.Cef)

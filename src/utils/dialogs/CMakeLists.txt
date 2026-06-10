@@ -18,4 +18,4 @@ target_link_libraries(noon_utils_dialogs PRIVATE
     Qt6::Qml
     Qt6::Quick
 )
-noon_install_qml(noon_utils_dialogs Noon.Utils.Dialogs)
+noon_setup(noon_utils_dialogs Noon.Utils.Dialogs)

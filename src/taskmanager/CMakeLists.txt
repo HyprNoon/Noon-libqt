@@ -7,4 +7,4 @@ qt_add_qml_module(noon_taskmanager
 )
 
 target_link_libraries(noon_taskmanager PRIVATE Qt6::Quick)
-noon_install_qml(noon_taskmanager Noon.TaskManager)
+noon_setup(noon_taskmanager Noon.TaskManager)

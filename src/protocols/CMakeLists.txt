@@ -11,4 +11,4 @@ target_link_libraries(noon_protocols PRIVATE
     Qt6::Core
     Qt6::Qml
 )
-noon_install_qml(noon_protocols Noon.Protocols)
+noon_setup(noon_protocols Noon.Protocols)

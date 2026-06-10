@@ -15,4 +15,4 @@ target_link_libraries(noon_utils_latex PRIVATE
     Qt6::Concurrent
     ${CLATEX_LIBRARIES}
 )
-noon_install_qml(noon_utils_latex Noon.Utils.Latex)
+noon_setup(noon_utils_latex Noon.Utils.Latex)

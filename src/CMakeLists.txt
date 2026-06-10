@@ -13,4 +13,4 @@ qt_add_qml_module(noon
 )
 
 target_link_libraries(noon PRIVATE Qt6::Quick)
-noon_install_qml(noon Noon)
+noon_setup(noon Noon)

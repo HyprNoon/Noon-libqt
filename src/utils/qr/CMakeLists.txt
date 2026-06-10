@@ -3,7 +3,7 @@ qt_add_qml_module(noon_utils_qr
     VERSION 1.0
     OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/Noon/Utils/Qr"
     SOURCES
-    
+
     qrcode.cpp
     qrcode.hpp
 )
@@ -22,4 +22,4 @@ target_link_libraries(noon_utils_qr  PRIVATE
     Qt6::Svg
     qtqr
 )
-noon_install_qml(noon_utils_qr Noon.Utils.Qr)
+noon_setup(noon_utils_qr Noon.Utils.Qr)

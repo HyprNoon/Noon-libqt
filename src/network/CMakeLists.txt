@@ -17,4 +17,4 @@ target_link_libraries(noon_network PRIVATE
     Qt6::Concurrent
     Qt6::Quick
 )
-noon_install_qml(noon_network Noon.Network)
+noon_setup(noon_network Noon.Network)

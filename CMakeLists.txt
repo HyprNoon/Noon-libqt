@@ -21,7 +21,7 @@ if(NOT QML_INSTALL_DIR)
   set(QML_INSTALL_DIR "${QT6_INSTALL_PREFIX}/lib/qt6/qml" CACHE PATH "QML module install dir")
 endif()
 
-function(noon_install_qml target uri)
+function(noon_setup target uri)
   string(REPLACE "." "/" uri_path ${uri})
   install(TARGETS ${target} ${target}plugin DESTINATION "${QML_INSTALL_DIR}/${uri_path}")
   qt_query_qml_module(${target} QMLDIR _qmldir TYPEINFO _typeinfo)

@@ -17,4 +17,4 @@ target_link_libraries(noon_hypr PRIVATE
     Qt6::Concurrent
     Qt6::Quick
 )
-noon_install_qml(noon_hypr Noon.Hypr)
+noon_setup(noon_hypr Noon.Hypr)
