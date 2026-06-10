@@ -8,6 +8,7 @@
 #include <QDir>
 #include <QFile>
 #include <QTextStream>
+#include <QThread>
 #include <QtQml/qqmlregistration.h>
 
 #include <csignal>
@@ -50,6 +51,7 @@ private:
     QTimer m_timer;
     QVariantList m_processes;
     int m_processCount = 0;
+    int m_cpuCount = QThread::idealThreadCount();
 
     using TimePoint = std::chrono::steady_clock::time_point;
     TimePoint m_lastRefresh = std::chrono::steady_clock::now();
@@ -116,7 +118,7 @@ inline void TaskManager::refresh()
         if (prevIt != m_prevProcCpu.constEnd()) {
             auto dUtime = utime - prevIt->utime;
             auto dStime = stime - prevIt->stime;
-            cpuPct = (dUtime + dStime) / elapsedTicks * 100.0;
+            cpuPct = (dUtime + dStime) / elapsedTicks * 100.0 / m_cpuCount;
             if (cpuPct < 0.0) cpuPct = 0.0;
         }
 
