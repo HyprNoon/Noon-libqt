@@ -22,11 +22,4 @@ target_link_libraries(noon_utils_qr  PRIVATE
     Qt6::Svg
     qtqr
 )
-
-if(NOT QML_INSTALL_DIR)
-    set(QML_INSTALL_DIR "${QT6_INSTALL_PREFIX}/lib/qt6/qml" CACHE PATH "QML install dir")
-endif()
-
-install(TARGETS noon_utils_qr  noon_utils_qrplugin DESTINATION "${QML_INSTALL_DIR}/Noon/Utils/Qr")
-qt_query_qml_module(noon_utils_qr  QMLDIR qmldir_qr TYPEINFO typeinfo_qr)
-install(FILES ${qmldir_qr} ${typeinfo_qr} DESTINATION "${QML_INSTALL_DIR}/Noon/Utils/Qr")
+noon_install_qml(noon_utils_qr Noon.Utils.Qr)

@@ -27,11 +27,4 @@ set_target_properties(noon_utils_cef PROPERTIES
     INSTALL_RPATH "${QCEFVIEW_DIR}/bin"
     BUILD_RPATH "${QCEFVIEW_DIR}/bin"
 )
-
-if(NOT QML_INSTALL_DIR)
-    set(QML_INSTALL_DIR "${QT6_INSTALL_PREFIX}/lib/qt6/qml" CACHE PATH "QML install dir")
-endif()
-
-install(TARGETS noon_utils_cef noon_utils_cefplugin DESTINATION "${QML_INSTALL_DIR}/Noon/Utils/Cef")
-qt_query_qml_module(noon_utils_cef QMLDIR qmldir_cef TYPEINFO typeinfo_cef)
-install(FILES ${qmldir_cef} ${typeinfo_cef} DESTINATION "${QML_INSTALL_DIR}/Noon/Utils/Cef")
+noon_install_qml(noon_utils_cef Noon.Utils.Cef)
