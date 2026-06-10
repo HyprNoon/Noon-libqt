@@ -18,11 +18,33 @@ find_package(KF6KIO REQUIRED)
 include(GNUInstallDirs)
 
 if(NOT QML_INSTALL_DIR)
-  set(QML_INSTALL_DIR "${QT6_INSTALL_PREFIX}/lib/qt6/qml" CACHE PATH "QML module install dir")
+  set(QML_INSTALL_DIR "${QT6_INSTALL_PREFIX}/${QT6_INSTALL_QML}" CACHE PATH "QML module install dir")
 endif()
 
 function(noon_setup target uri)
+  cmake_parse_arguments(NOON "" "" "SOURCES;LINK;DEFINES;INCLUDES" ${ARGN})
+
   string(REPLACE "." "/" uri_path ${uri})
+
+  qt_add_qml_module(${target}
+    URI ${uri}
+    VERSION ${PROJECT_VERSION}
+    OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${uri_path}"
+    SOURCES ${NOON_SOURCES}
+  )
+
+  if(NOON_LINK)
+    target_link_libraries(${target} PRIVATE ${NOON_LINK})
+  endif()
+
+  if(NOON_DEFINES)
+    target_compile_definitions(${target} PRIVATE ${NOON_DEFINES})
+  endif()
+
+  if(NOON_INCLUDES)
+    target_include_directories(${target} PRIVATE ${NOON_INCLUDES})
+  endif()
+
   install(TARGETS ${target} ${target}plugin DESTINATION "${QML_INSTALL_DIR}/${uri_path}")
   qt_query_qml_module(${target} QMLDIR _qmldir TYPEINFO _typeinfo)
   install(FILES ${_qmldir} ${_typeinfo} DESTINATION "${QML_INSTALL_DIR}/${uri_path}")
