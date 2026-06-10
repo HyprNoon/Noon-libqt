@@ -10,8 +10,7 @@ class FileProtocols : public QObject {
     QML_ELEMENT
     QML_SINGLETON
 public:
-    static FileProtocols* instance();
-    static FileProtocols* create(QQmlEngine*, QJSEngine*);
+    static FileProtocols* create(QQmlEngine* engine, QJSEngine*);
 
     Q_INVOKABLE bool exists(const QString& path) const;
     Q_INVOKABLE qint64 size(const QString& path) const;
@@ -35,7 +34,6 @@ public:
     Q_INVOKABLE bool removeDir(const QString& path, bool recursive = false) const;
 
 private:
-    FileProtocols();
-    ~FileProtocols() = default;
+    explicit FileProtocols(QObject* parent);
     Q_DISABLE_COPY(FileProtocols)
 };

@@ -5,16 +5,11 @@
 #include <QIODevice>
 #include <QTextStream>
 
-FileProtocols* FileProtocols::instance() {
-    static FileProtocols* ins = new FileProtocols();
-    return ins;
+FileProtocols* FileProtocols::create(QQmlEngine* engine, QJSEngine*) {
+    return new FileProtocols(engine);
 }
 
-FileProtocols* FileProtocols::create(QQmlEngine*, QJSEngine*) {
-    return instance();
-}
-
-FileProtocols::FileProtocols() : QObject(nullptr) {}
+FileProtocols::FileProtocols(QObject* parent) : QObject(parent) {}
 
 bool FileProtocols::exists(const QString& path) const {
     return QFile::exists(path);
