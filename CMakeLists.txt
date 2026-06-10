@@ -8,7 +8,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick Sql Concurrent)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick Sql Svg Concurrent)
 qt_standard_project_setup(REQUIRES 6.5)
 
 find_package(ECM REQUIRED NO_MODULE)
