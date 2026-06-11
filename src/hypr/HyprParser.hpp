@@ -80,7 +80,8 @@ private:
         (void)QtConcurrent::run([path, data]() {
             QFile file(path);
             if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) return;
-            const QList<QByteArray> raw = file.readAll().split('\n');
+            QList<QByteArray> raw = file.readAll().split('\n');
+            while (!raw.isEmpty() && raw.last().isEmpty()) raw.removeLast();
             file.close();
 
             QByteArrayList out;
