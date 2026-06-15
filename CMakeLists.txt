@@ -8,12 +8,11 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick Sql Svg Concurrent)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Qml Quick Sql Concurrent Widgets Svg Network)
 qt_standard_project_setup(REQUIRES 6.5)
 
 find_package(ECM REQUIRED NO_MODULE)
 set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH} ${CMAKE_MODULE_PATH})
-find_package(KF6KIO REQUIRED)
 
 include(GNUInstallDirs)
 
@@ -22,7 +21,20 @@ if(NOT QML_INSTALL_DIR)
 endif()
 
 function(noon_setup target uri)
-  cmake_parse_arguments(NOON "" "" "SOURCES;LINK;DEFINES;INCLUDES" ${ARGN})
+  cmake_parse_arguments(NOON "" "" "SOURCES;LINK;DEFINES;INCLUDES;QT_COMPONENTS;PACKAGES;PKG_CHECK" ${ARGN})
+
+  if(NOON_PACKAGES)
+    foreach(pkg ${NOON_PACKAGES})
+      find_package(${pkg} REQUIRED)
+    endforeach()
+  endif()
+
+  if(NOON_PKG_CHECK)
+    find_package(PkgConfig REQUIRED)
+    list(POP_FRONT NOON_PKG_CHECK _pkg_prefix)
+    pkg_check_modules(${_pkg_prefix} REQUIRED IMPORTED_TARGET GLOBAL ${NOON_PKG_CHECK})
+    list(APPEND NOON_LINK PkgConfig::${_pkg_prefix})
+  endif()
 
   string(REPLACE "." "/" uri_path ${uri})
 

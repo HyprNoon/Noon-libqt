@@ -2,6 +2,8 @@ noon_setup(noon_utils_dialogs Noon.Utils.Dialogs
     SOURCES
         font_dialog.cpp
         font_dialog.hpp
+    QT_COMPONENTS
+        Core Gui Widgets Qml Quick
     LINK
         Qt6::Core
         Qt6::Gui

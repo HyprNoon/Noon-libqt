@@ -6,5 +6,6 @@ add_subdirectory(hypr)
 add_subdirectory(devices)
 
 noon_setup(noon Noon
+    QT_COMPONENTS Qml Quick
     LINK Qt6::Quick
 )
