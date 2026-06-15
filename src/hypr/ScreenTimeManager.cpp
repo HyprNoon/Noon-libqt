@@ -23,6 +23,13 @@ ScreenTimeManager::ScreenTimeManager(QObject *parent) : QObject(parent)
 
 ScreenTimeManager::~ScreenTimeManager() = default;
 
+void ScreenTimeManager::init(QObject *parent, const QString &dbPath)
+{
+    setParent(parent);
+    if (!dbPath.isEmpty())
+        setDbPath(dbPath);
+}
+
 void ScreenTimeManager::setDbPath(const QString &path)
 {
     if (m_dbPath == path) return;

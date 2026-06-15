@@ -33,6 +33,8 @@ public:
     void setBridge(HyprBridge *bridge);
     void setSaveInterval(int ms);
 
+    Q_INVOKABLE void init(QObject *parent, const QString &dbPath = QString());
+
     Q_INVOKABLE QJsonArray getDay(const QString &date) const;
     Q_INVOKABLE QJsonArray getDayTotals(const QString &date) const;
     Q_INVOKABLE QJsonArray getDayTimeline(const QString &date, int fromSec, int toSec) const;

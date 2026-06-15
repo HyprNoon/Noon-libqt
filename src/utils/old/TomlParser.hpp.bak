@@ -1,0 +1,468 @@
+#pragma once
+#include <QObject>
+#include <QVariantMap>
+#include <QVariantList>
+#include <QFile>
+#include <QTextStream>
+#include <QtQml/qqmlregistration.h>
+
+class TomlParser : public QObject {
+    Q_OBJECT
+    QML_ELEMENT
+
+public:
+    explicit TomlParser(QObject *parent = nullptr) : QObject(parent) {}
+
+    Q_INVOKABLE QVariantMap parse(const QString &filePath) {
+        QFile file(filePath);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+            return {};
+        return parseString(QString::fromUtf8(file.readAll()));
+    }
+
+    Q_INVOKABLE QVariantMap parseString(const QString &toml) {
+        QVariantMap root;
+        QStringList sectionPath;
+
+        const auto lines = toml.split('\n');
+        for (const auto &raw : lines) {
+            QString line = raw.trimmed();
+            if (line.isEmpty() || line.startsWith('#'))
+                continue;
+
+            if (line.startsWith('[')) {
+                int close = line.lastIndexOf(']');
+                if (close < 0) continue;
+                QString header = line.mid(1, close - 1).trimmed();
+                sectionPath = header.split('.');
+                ensurePath(root, sectionPath);
+                continue;
+            }
+
+            int eq = line.indexOf('=');
+            if (eq < 0) continue;
+
+            QString keyStr = line.left(eq).trimmed();
+            QString valStr = line.mid(eq + 1).trimmed();
+            QStringList keys = parseKeyPath(keyStr);
+            QStringList fullPath = sectionPath + keys;
+            deepSet(root, fullPath, parseValue(valStr));
+        }
+        return root;
+    }
+
+    Q_INVOKABLE QVariantList parseTemplates(const QString &filePath) {
+        QFile file(filePath);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+            return {};
+        return parseTemplatesString(QString::fromUtf8(file.readAll()));
+    }
+
+    Q_INVOKABLE QVariantList parseTemplatesString(const QString &toml) {
+        QVariantList entries;
+        const auto lines = toml.split('\n');
+
+        QString currentName;
+        bool currentEnabled = false;
+        QVariantMap currentEntry;
+        bool inTemplatesPlain = false;
+
+        auto flush = [&] {
+            if (!currentName.isEmpty()) {
+                currentEntry["name"] = currentName;
+                currentEntry["enabled"] = currentEnabled;
+                entries.append(currentEntry);
+                currentEntry.clear();
+                currentName.clear();
+            }
+        };
+
+        for (const auto &raw : lines) {
+            QString trimmed = raw.trimmed();
+            bool isCommented = trimmed.startsWith('#');
+            QString content = trimmed;
+
+            if (isCommented) {
+                content = content.mid(1).trimmed();
+                while (content.startsWith('#') || content.startsWith(' '))
+                    content = content.mid(1).trimmed();
+            }
+
+            if (content.startsWith('[')) {
+                flush();
+                inTemplatesPlain = false;
+                int close = content.lastIndexOf(']');
+                if (close < 0) continue;
+                QString header = content.mid(1, close - 1).trimmed();
+                if (header == QStringLiteral("templates")) {
+                    inTemplatesPlain = true;
+                } else if (header.startsWith(QStringLiteral("templates."))) {
+                    currentName = header.mid(10);
+                    currentEnabled = !isCommented;
+                }
+                continue;
+            }
+
+            int eq = content.indexOf('=');
+            if (eq < 0) {
+                if (!currentName.isEmpty() && content.isEmpty()) {
+                    flush();
+                }
+                continue;
+            }
+
+            if (!currentName.isEmpty()) {
+                QString key = content.left(eq).trimmed();
+                QString val = content.mid(eq + 1).trimmed();
+                int vi = 0;
+                currentEntry[key] = parseValue(val, vi);
+                continue;
+            }
+
+            if (inTemplatesPlain) {
+                QString name = content.left(eq).trimmed();
+                QString valStr = content.mid(eq + 1).trimmed();
+                int vi = 0;
+                QVariant val = parseValue(valStr, vi);
+                if (val.userType() == QMetaType::QVariantMap) {
+                    QVariantMap entry = val.toMap();
+                    entry["name"] = name;
+                    entry["enabled"] = !isCommented;
+                    entries.append(entry);
+                }
+                continue;
+            }
+        }
+        flush();
+        return entries;
+    }
+
+    Q_INVOKABLE bool addTemplate(const QString &filePath, const QString &name,
+                                  const QString &inputPath, const QString &outputPath) {
+        QFile file(filePath);
+        if (!file.open(QIODevice::Append | QIODevice::Text))
+            return false;
+        QTextStream out(&file);
+        out << "\n[templates." << name << "]\n"
+            << "input_path = \"" << inputPath << "\"\n"
+            << "output_path = \"" << outputPath << "\"\n";
+        return true;
+    }
+
+    Q_INVOKABLE bool removeTemplate(const QString &filePath, const QString &name) {
+        QFile file(filePath);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+            return false;
+        QString content = QString::fromUtf8(file.readAll());
+        file.close();
+
+        const auto lines = content.split('\n');
+        QStringList out;
+        bool inTarget = false;
+        QString sectionPattern = QStringLiteral("templates.") + name;
+
+        for (const auto &line : lines) {
+            QString trimmed = line.trimmed();
+            bool lineCommented = trimmed.startsWith('#');
+            QString contentLine = lineCommented
+                ? trimmed.mid(1).trimmed() : trimmed;
+
+            if (contentLine.startsWith('[')) {
+                if (inTarget) inTarget = false;
+                int close = contentLine.lastIndexOf(']');
+                if (close > 0) {
+                    QString header = contentLine.mid(1, close - 1).trimmed();
+                    if (header == sectionPattern) {
+                        inTarget = true;
+                        out << (lineCommented ? line : QStringLiteral("# ") + line);
+                        continue;
+                    }
+                }
+            }
+
+            if (inTarget) {
+                if (!trimmed.isEmpty() && !lineCommented)
+                    out << QStringLiteral("# ") + line;
+                else
+                    out << line;
+            } else {
+                out << line;
+            }
+        }
+
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
+            return false;
+        file.write(out.join('\n').toUtf8());
+        return true;
+    }
+
+    Q_INVOKABLE bool enableTemplate(const QString &filePath, const QString &name) {
+        QFile file(filePath);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+            return false;
+        const auto lines = QString::fromUtf8(file.readAll()).split('\n');
+        file.close();
+
+        QStringList out;
+        bool inTarget = false;
+        QString sectionPattern = QStringLiteral("templates.") + name;
+
+        for (const auto &line : lines) {
+            QString trimmed = line.trimmed();
+            bool lineCommented = trimmed.startsWith('#');
+            QString rawContent = lineCommented ? trimmed.mid(1).trimmed() : trimmed;
+
+            if (rawContent.startsWith('[')) {
+                if (inTarget) inTarget = false;
+                int close = rawContent.lastIndexOf(']');
+                if (close > 0) {
+                    QString header = rawContent.mid(1, close - 1).trimmed();
+                    if (header == sectionPattern) {
+                        inTarget = true;
+                        if (lineCommented) {
+                            int hashPos = line.indexOf('#');
+                            QString beforeHash = line.left(hashPos);
+                            QString afterHash = line.mid(hashPos + 1);
+                            if (afterHash.startsWith(' ')) afterHash = afterHash.mid(1);
+                            out << beforeHash + afterHash;
+                        } else {
+                            out << line;
+                        }
+                        continue;
+                    }
+                }
+            }
+
+            if (inTarget) {
+                if (lineCommented) {
+                    int hashPos = -1;
+                    for (int i = 0; i < line.size(); ++i) {
+                        if (line[i] == '#') { hashPos = i; break; }
+                    }
+                    if (hashPos >= 0) {
+                        QString stripped = line.mid(hashPos + 1);
+                        if (stripped.startsWith(' ')) stripped = stripped.mid(1);
+                        out << QString(line.left(hashPos)) + stripped;
+                    } else {
+                        out << line;
+                    }
+                } else {
+                    out << line;
+                }
+            } else {
+                out << line;
+            }
+        }
+
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
+            return false;
+        file.write(out.join('\n').toUtf8());
+        return true;
+    }
+
+    Q_INVOKABLE bool setTemplate(const QString &filePath, const QString &name,
+                                  const QString &inputPath, const QString &outputPath) {
+        QFile file(filePath);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+            return false;
+        const auto lines = QString::fromUtf8(file.readAll()).split('\n');
+        file.close();
+
+        QStringList out;
+        bool inTarget = false;
+        bool found = false;
+        QString sectionPattern = QStringLiteral("templates.") + name;
+
+        auto captureIndent = [](const QString &l) -> QString {
+            QString ind;
+            for (const QChar &c : l) {
+                if (c == ' ' || c == '\t') ind += c;
+                else break;
+            }
+            return ind;
+        };
+
+        for (const auto &line : lines) {
+            QString trimmed = line.trimmed();
+            bool lineCommented = trimmed.startsWith('#');
+            QString rawContent = lineCommented ? trimmed.mid(1).trimmed() : trimmed;
+
+            if (rawContent.startsWith('[')) {
+                if (inTarget) inTarget = false;
+                int close = rawContent.lastIndexOf(']');
+                if (close > 0) {
+                    QString header = rawContent.mid(1, close - 1).trimmed();
+                    if (header == sectionPattern) {
+                        inTarget = true;
+                        found = true;
+                    }
+                }
+            }
+
+            if (inTarget) {
+                int eq = rawContent.indexOf('=');
+                if (eq > 0) {
+                    QString key = rawContent.left(eq).trimmed();
+                    if (key == QStringLiteral("input_path")) {
+                        out << captureIndent(line) + QStringLiteral("input_path = \"") + inputPath + QLatin1Char('"');
+                        continue;
+                    }
+                    if (key == QStringLiteral("output_path")) {
+                        out << captureIndent(line) + QStringLiteral("output_path = \"") + outputPath + QLatin1Char('"');
+                        continue;
+                    }
+                }
+            }
+
+            out << line;
+        }
+
+        if (!found) {
+            out << QStringLiteral("\n[templates.") + name + QStringLiteral("]\n")
+                << QStringLiteral("input_path = \"") + inputPath + QStringLiteral("\"\n")
+                << QStringLiteral("output_path = \"") + outputPath + QLatin1Char('"');
+        }
+
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
+            return false;
+        file.write(out.join('\n').toUtf8());
+        return true;
+    }
+
+private:
+    static void ensurePath(QVariantMap &map, const QStringList &path, int depth = 0) {
+        if (depth >= path.size()) return;
+        const QString &key = path[depth];
+        if (!map.contains(key) || map.value(key).isNull())
+            map[key] = QVariantMap();
+        QVariantMap sub = map[key].toMap();
+        ensurePath(sub, path, depth + 1);
+        map[key] = sub;
+    }
+
+    static void deepSet(QVariantMap &map, const QStringList &keys, const QVariant &value, int depth = 0) {
+        if (depth >= keys.size()) return;
+        const QString &key = keys[depth];
+        if (depth == keys.size() - 1) {
+            map[key] = value;
+            return;
+        }
+        QVariantMap sub = map.value(key).toMap();
+        deepSet(sub, keys, value, depth + 1);
+        map[key] = sub;
+    }
+
+    static QStringList parseKeyPath(const QString &str) {
+        QStringList result;
+        int i = 0;
+        skipSpace(str, i);
+        while (i < str.size()) {
+            result << parseKey(str, i);
+            skipSpace(str, i);
+            if (i < str.size() && str[i] == '.') {
+                i++;
+                skipSpace(str, i);
+            } else {
+                break;
+            }
+        }
+        return result;
+    }
+
+    static QString parseKey(const QString &s, int &i) {
+        skipSpace(s, i);
+        if (i >= s.size()) return {};
+        if (s[i] == '"' || s[i] == '\'')
+            return parseQuotedString(s, i);
+        int start = i;
+        while (i < s.size() && (s[i].isLetterOrNumber() || s[i] == '_' || s[i] == '-'))
+            i++;
+        return s.mid(start, i - start);
+    }
+
+    static QVariant parseValue(const QString &s, int start = 0) {
+        int i = start;
+        skipSpace(s, i);
+        if (i >= s.size()) return {};
+
+        if (s[i] == '{')
+            return QVariant(parseInlineTable(s, i));
+
+        if (s[i] == '"' || s[i] == '\'')
+            return parseQuotedString(s, i);
+
+        int end = i;
+        while (end < s.size() && !QChar(s[end]).isSpace()
+               && s[end] != '#' && s[end] != ','
+               && s[end] != ']' && s[end] != '}')
+            end++;
+
+        QString raw = s.mid(i, end - i).trimmed();
+        if (raw.isEmpty()) return {};
+
+        if (raw.compare("true", Qt::CaseInsensitive) == 0) return true;
+        if (raw.compare("false", Qt::CaseInsensitive) == 0) return false;
+
+        bool ok = false;
+        qlonglong n = raw.toLongLong(&ok);
+        if (ok) return n;
+
+        double d = raw.toDouble(&ok);
+        if (ok) return d;
+
+        return raw;
+    }
+
+    static QVariantMap parseInlineTable(const QString &s, int &i) {
+        QVariantMap result;
+        i++;
+        while (i < s.size()) {
+            skipSpace(s, i);
+            if (i >= s.size() || s[i] == '}') break;
+
+            QString key = parseKey(s, i);
+            skipSpace(s, i);
+            if (i < s.size() && s[i] == '=') i++;
+            skipSpace(s, i);
+
+            result[key] = (i < s.size() && s[i] == '{')
+                ? QVariant(parseInlineTable(s, i))
+                : parseValue(s, i);
+
+            skipSpace(s, i);
+            if (i < s.size() && s[i] == ',') i++;
+        }
+        if (i < s.size() && s[i] == '}') i++;
+        return result;
+    }
+
+    static QString parseQuotedString(const QString &s, int &i) {
+        if (i >= s.size()) return {};
+        QChar quote = s[i];
+        if (quote != '"' && quote != '\'') return {};
+        i++;
+        QString result;
+        while (i < s.size() && s[i] != quote) {
+            if (quote == '"' && s[i] == '\\' && i + 1 < s.size()) {
+                i++;
+                switch (s[i].toLatin1()) {
+                case 'n': result += '\n'; break;
+                case 't': result += '\t'; break;
+                case 'r': result += '\r'; break;
+                case '\\': result += '\\'; break;
+                case '"': result += '"'; break;
+                default: result += s[i]; break;
+                }
+            } else {
+                result += s[i];
+            }
+            i++;
+        }
+        if (i < s.size() && s[i] == quote) i++;
+        return result;
+    }
+
+    static void skipSpace(const QString &s, int &i) {
+        while (i < s.size() && QChar(s[i]).isSpace()) i++;
+    }
+};
